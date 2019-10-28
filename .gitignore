@@ -102,4 +102,15 @@ venv.bak/
 
 # mypy
 .mypy_cache/
-data/chime_home/chunks/
+
+# glull project
+data/
+analysis/**/*.csv
+analysis/**/*.pkl
+
+!analysis/**/chime_mfcc.csv.zip
+
+# mac
+.DS_Store
+.vscode
+

@@ -28,6 +28,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
 from sklearn.linear_model import LogisticRegression, LogisticRegressionCV
 from sklearn.pipeline import Pipeline
+from sklearn.metrics import classification_report
 
 # (glull) custom functions
 from src.utilities import data as gldata
@@ -85,7 +86,7 @@ def main():
     y_test = train_val_test['y_test']
 
     print('\ndata set train balance: ', sum(y_train)/len(y_train) * 100)
-    print('data set test balance: ', sum(y_test)/len(y_test) * 100)
+    print('data set test_ balance: ', sum(y_test)/len(y_test) * 100)
 
     # single inner loop
     # pca, X_train_pca = reduce_dimensions(X_train_scaled, 0.5)
@@ -103,15 +104,16 @@ def main():
 
 
     results = []
-    for var_explained in np.arange(0.5, 0.9, 0.1):
+    for var_explained in np.arange(0.1, 0.9, 0.1):
 
         pca, X_train_pca = reduce_dimensions(X_train_scaled, var_explained)
-        logregcv = LogisticRegressionCV(Cs=np.arange(100, 10000, 500), cv=3)
+        logregcv = LogisticRegressionCV(Cs=np.arange(1, 10000, 100), cv=3, max_iter=1000)
         logregcv.fit(X_train_pca, y_train)
 
-        # y_predictions = logregcv.predict(X_test_scaled, y_test)
         X_test_transformed = pca.transform(X_test_scaled)
+        y_pred = logregcv.predict(X_test_transformed)
         model_score = logregcv.score(X_test_transformed, y_test)
+        report = classification_report(y_test, y_pred, target_names=['no_human', 'has_human'], output_dict=True)
 
         results.append({
             'var_explained': var_explained,
@@ -119,7 +121,10 @@ def main():
             'n_components': pca.n_components_,
             'logregcv_cs': logregcv.C_,
             'pca': pca,
-            'scaler': scaler
+            'scaler': scaler,
+            'f1_no_human': report['no_human'],
+            'f1_has_human': report['has_human'],
+            'y_pred': y_pred
 
         })
 
@@ -132,4 +137,12 @@ def main():
 
 if __name__ == '__main__':
     results = main()
-    print('\main() completed\n')
+    print('\nmain() completed\n')
+
+# {'var_explained': 0.5,
+#   'metric': 0.8487179487179487,
+#   'n_components': 79,
+#   'logregcv_cs': array([1]),
+#   'pca': PCA(copy=True, iterated_power='auto', n_components=0.5, random_state=None,
+#       svd_solver='auto', tol=0.0, whiten=False),
+#   'scaler': StandardScaler(copy=True, with_mean=True, with_std=True)}

@@ -1,3 +1,13 @@
+# (glull) file is used to massage the data from the Chime project.
+
+# this constant is primarily used to debug,
+# to run this file and extract all the audio samples, set this limit to None.
+MAX_FILES_TO_EXTRACT = 5 # None
+
+# At this point i do not know how to get the root folder programmatically,
+# if this file/folder is moved around the rel path needs to be updated
+ROOT_FOLDER = '../../'
+
 import glob
 import pandas as pd
 import numpy as np
@@ -6,16 +16,15 @@ import pickle
 import time
 
 # my files
-from src.utilities import feature_extraction as fex
-
+from src.utilities import feature_extraction as glfex
 
 # constants
-data_folder = 'data/chime_home/'
+data_folder = f'{ROOT_FOLDER}data/chime_home/'
 data_chunks = f'{data_folder}chunks/'
 dev_chunks_refined_filename = 'development_chunks_refined.csv'
 
-eval_dev_chunks = glob.glob('data/chime_home/*.csv')
-raw_chunks = glob.glob('data/chime_home/chunks/*.csv')
+eval_dev_chunks = glob.glob(f'{data_folder}*.csv')
+raw_chunks = glob.glob(f'{data_chunks}*.csv')
 
 def get_all_csv_files(filenames):
     """
@@ -90,7 +99,7 @@ def extract_features_df(df, max=None, column_name = 'chunkname', codec='.48kHz.w
 
         chunkname = row[column_name]
         chunk_filename = f'{data_chunks}{chunkname}{codec}'
-        features = fex.extract_features(chunk_filename)
+        features = glfex.extract_features(chunk_filename)
         results[chunkname] = features
         
         count += 1
@@ -115,9 +124,9 @@ def merge_features(df, features):
             # feature_mfcc_delta_flattened = np.array(feature_mfcc_delta).flatten().tolist()
             # feature_beat_mfcc_delta_flattened = np.array(feature_beat_mfcc_delta).flatten().tolist()
 
-            feature_mfcc_flattened = fex.flatten(feature_mfcc)
-            feature_mfcc_delta_flattened = fex.flatten(feature_mfcc_delta)
-            feature_beat_mfcc_delta_flattened = fex.flatten(feature_beat_mfcc_delta)
+            feature_mfcc_flattened = glfex.flatten(feature_mfcc)
+            feature_mfcc_delta_flattened = glfex.flatten(feature_mfcc_delta)
+            feature_beat_mfcc_delta_flattened = glfex.flatten(feature_beat_mfcc_delta)
 
             flattened_mfcc_features = feature_mfcc_flattened + feature_mfcc_delta_flattened + feature_beat_mfcc_delta_flattened
 
@@ -163,7 +172,7 @@ def main():
 
     # extract features from audio samples, this contains ALL features, e.g.:
     # mfcc, mfcc_delta, chromagram, etc.
-    mfcc_features = extract_features_df(human_features_df)
+    mfcc_features = extract_features_df(human_features_df, MAX_FILES_TO_EXTRACT)
     features_pkl_filename = 'chime_mfcc_features_only.pkl'
     with open(features_pkl_filename, 'wb') as writefile:
         pickle.dump(mfcc_features, writefile)

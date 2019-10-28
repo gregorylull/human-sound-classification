@@ -107,8 +107,11 @@ venv.bak/
 data/
 analysis/**/*.csv
 analysis/**/*.pkl
+analysis/**/*.zip
 
-!analysis/**/chime_mfcc.csv.zip
+!analysis/chime/chime_mfcc_features_only.pkl.zip
+!analysis/chime/chime_mfcc.csv.zip
+!analysis/chime/train_val_test.pkl.zip
 
 # mac
 .DS_Store

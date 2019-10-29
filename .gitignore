@@ -113,6 +113,12 @@ analysis/**/*.zip
 !analysis/chime/chime_mfcc.csv.zip
 !analysis/chime/train_val_test.pkl.zip
 
+!analysis/chime/grid_*.pkl
+!analysis/chime/grid_*.pkl
+!analysis/chime/grid_*.pkl
+!analysis/chime/model_final_results*.pkl
+
+
 # mac
 .DS_Store
 .vscode

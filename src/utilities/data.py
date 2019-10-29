@@ -13,7 +13,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
 from sklearn.linear_model import LogisticRegression, LogisticRegressionCV
-from sklearn.metrics import classification_report, f1_score, make_scorer
+from sklearn.metrics import classification_report, f1_score, make_scorer, accuracy_score
 
 from sklearn.pipeline import Pipeline
 from sklearn.model_selection import GridSearchCV
@@ -100,9 +100,14 @@ def get_model(model='logreg'):
     elif model=='knn':
         return KNeighborsClassifier()
 
-def get_scoring_metric(metric='f1'):
+def get_scoring_metric(**kwargs):
+    metric = kwargs['metric'] if 'metric' in kwargs and kwargs['metric'] else 'accuracy'
+
     if metric == 'f1':
         return make_scorer(f1_score, greater_is_better=True)
+
+    elif metric == 'accuracy':
+        return make_scorer(accuracy_score, greater_is_better=True)
 
 def get_pipeline(model_type):
 
@@ -117,14 +122,14 @@ def get_pipeline(model_type):
     return model_pipeline
 
 
-def train_fit_test_pipeline(X, y, model_type='logreg', params={}, metric='f1', cv=3, **kwargs):
+def train_fit_test_pipeline(X, y, model_type='logreg', params={}, cv=3, **kwargs):
     """
     using pipeline to prevent crossfold leakage, e.g.:
     https://towardsdatascience.com/pre-process-data-with-pipeline-to-prevent-data-leakage-during-cross-validation-e3442cca7fdc
     """
     model_pipeline = get_pipeline(model_type)
 
-    scoring_metric = get_scoring_metric(metric)
+    scoring_metric = get_scoring_metric(**kwargs)
 
     grid = GridSearchCV(model_pipeline, params, cv=cv, scoring=scoring_metric)
 

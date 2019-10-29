@@ -59,6 +59,9 @@ USE_CACHED_TRAIN_VAL_TEST = True
 # 1) test pipeline, and 2) introduce new models
 FAST_MODELING = False
 
+# Metric to compare gridCV, options: 'f1' | 'accuracy' 
+METRIC = 'f1'
+
 # Set to False to retrain to model, otherwise use pkl.
 USE_CACHED = {
     'logreg': False,
@@ -67,12 +70,12 @@ USE_CACHED = {
 }
 
 PICKLE_FILENAMES = {
-    'logreg': f'{CURRENT_FOLDER}grid_logreg.pkl',
-    'svm': f'{CURRENT_FOLDER}grid_svm.pkl',
-    'knn': f'{CURRENT_FOLDER}grid_knn.pkl',
+    'logreg': f'{CURRENT_FOLDER}grid_logreg_{METRIC}.pkl',
+    'svm': f'{CURRENT_FOLDER}grid_svm_{METRIC}.pkl',
+    'knn': f'{CURRENT_FOLDER}grid_knn_{METRIC}.pkl',
 
     # final results
-    'final_results': f'{CURRENT_FOLDER}model_final_results.pkl',
+    'final_results': f'{CURRENT_FOLDER}model_final_results_metric_{METRIC}.pkl',
 }
 
 MODELS = {
@@ -102,7 +105,7 @@ def test_models(X, y):
                 model_grids[model_type] = pickle.load(readfile)
 
         else:
-            model_grids[model_type] = model(X, y, fast=FAST_MODELING)
+            model_grids[model_type] = model(X, y, metric=METRIC, fast=FAST_MODELING)
             if not FAST_MODELING:
                 print(f'  Saving model for {model_type}\n')
                 with open(PICKLE_FILENAMES[model_type], 'wb') as writefile:

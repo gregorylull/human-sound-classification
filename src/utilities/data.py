@@ -27,60 +27,47 @@ CHIME_FOLDER = f'analysis/chime/'
 
 def get_params(model='logreg', **kwargs):
 
+    # exit early and use model defaults when testing pipeline and introducing new models.
+    if 'fast' in kwargs and kwargs['fast']:
+        print(f'\n  Fast modeling for {model}\n')
+        return {
+            'pca__n_components': [1]
+        }
+
     # there could be thousands of features, so instead of narrowing down
     # how many components to capture, this is indicating how much variation to capture.
     # 0.1 means keep enough pca components to explain at least 10% of the variation.
     pca_component_range = np.arange(0.1, 1.0, 0.1)
 
     if model=='logreg':
-
-        if 'fast' in kwargs:
-            print('\n  Fast modeling for logreg\n')
-            return {
-                'pca__n_components': [1]
-            }
-        else:
-            return {
-                # the higher the C the more important the features.
-                # the lower the C the more powerful the regularization.
-                'logreg__C': np.arange(1, 1000, 100),
-                'pca__n_components': pca_component_range
-            }
+        return {
+            # the higher the C the more important the features.
+            # the lower the C the more powerful the regularization.
+            'logreg__C': np.arange(1, 1000, 100),
+            'pca__n_components': pca_component_range
+        }
 
     elif model=='svm':
+        return {
+            'svm__kernel': ['linear', 'poly', 'rbf'],
 
-        if 'fast' in kwargs:
-            print('\n  Fast modeling for svm\n')
-            return {
-                'pca__n_components': [1]
-            }
-        else:
-            return {
-                'svm__kernel': ['linear', 'poly', 'rbf'],
+            # the higher the gamma the more likely model will overfit to the data.
+            'svm__gamma': [*np.arange(0.1, 1, 0.2), 1, 2, 3],
 
-                # the higher the gamma the more likely model will overfit to the data.
-                'svm__gamma': [*np.arange(0.1, 1, 0.2), 1, 2, 3],
+            # C relates to the penalty term, moves the boundary, high will lead to overfit
+            'svm__C': [0.1, 0.5, 1, 3, 5],
 
-                # C relates to the penalty term, moves the boundary, high will lead to overfit
-                'svm__C': [0.1, 0.5, 1, 3, 5],
+            # degree is for polynomial
+            'svm__degree': [1, 2, 3, 4],
 
-                # degree is for polynomial
-                'svm__degree': [1, 2, 3, 4],
-
-                'pca__n_components': pca_component_range
-            }
+            'pca__n_components': pca_component_range
+        }
     
     elif model=='knn':
-        if 'fast' in kwargs:
-            print('\n  Fast modeling for knn\n')
-            return {
-                'pca__n_components': [1]
-            }
-        else:
-            return {
-                'knn__n_neighbors': np.arange(5, 30, 5),
-                'pca__n_components': pca_component_range
-            }
+        return {
+            'knn__n_neighbors': np.arange(5, 30, 5),
+            'pca__n_components': pca_component_range
+        }
 
 def get_grid_pipeline(model_type, params_=None):
     def pipeline(X, y, **kwargs):
@@ -105,10 +92,10 @@ def get_grid_pipeline(model_type, params_=None):
 
 def get_model(model='logreg'):
     if model=='logreg':
-        return LogisticRegression(solver='lbfgs', max_iter=200)
+        return LogisticRegression(solver='lbfgs', max_iter=500)
 
     elif model=='svm':
-        return svm.SVC(gamma='auto', cache_size=1000, max_iter=3000)
+        return svm.SVC(gamma='auto', cache_size=1000, max_iter=5000)
 
     elif model=='knn':
         return KNeighborsClassifier()

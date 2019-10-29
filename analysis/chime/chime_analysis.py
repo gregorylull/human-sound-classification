@@ -10,6 +10,18 @@ The aim for this file is to do all the analysis for the CHIME project, including
     - LogReg
     - RandomForest
 
+TODO
+
+MUST
+0. Need to use Validation to check model accuracy that is using different 
+  number of features (PCA components), DO NOT USE just remainder.
+
+1. LogisticRegressionCV can't guarantee your X input is going to be split
+  and standardized correctly. DO NOT USE.
+
+NICE TO HAVE
+2. Play around with thresholds for classifying
+
 """
 # At this point i do not know how to get the root folder programmatically,
 # if this file/folder is moved around the rel path needs to be updated
@@ -27,117 +39,138 @@ from matplotlib import pylab as plt
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
 from sklearn.linear_model import LogisticRegression, LogisticRegressionCV
+from sklearn.metrics import classification_report, f1_score
+
 from sklearn.pipeline import Pipeline
-from sklearn.metrics import classification_report
+from sklearn.model_selection import GridSearchCV
+
+from sklearn import svm
+from sklearn.neighbors import KNeighborsClassifier
+
 
 # (glull) custom functions
 from src.utilities import data as gldata
+from analysis.chime import reference_code as glref
 
+# Set to true to use pre split test val train sets.
 USE_CACHED_TRAIN_VAL_TEST = True
 
-def get_train_val_test(use_saved):
-    """
-    This is specific to the chime data set
-    """
-    tvt_filename = f'{CURRENT_FOLDER}train_val_test.pkl'
+# Set to true to use defaults for all the models, used primarily to:
+# 1) test pipeline, and 2) introduce new models
+FAST_MODELING = False
 
-    print('\nTrainValTest - using cached pkl :', use_saved)
+# Set to False to retrain to model, otherwise use pkl.
+USE_CACHED = {
+    'logreg': False,
+    'svm': False,
+    'knn': False
+}
 
-    if use_saved:
-        with open(tvt_filename, 'rb') as readfile:
-            train_val_test = pickle.load(readfile)
-    else:
+PICKLE_FILENAMES = {
+    'logreg': f'{CURRENT_FOLDER}grid_logreg.pkl',
+    'svm': f'{CURRENT_FOLDER}grid_svm.pkl',
+    'knn': f'{CURRENT_FOLDER}grid_knn.pkl',
 
-        # clean and remove NaN
-        chime_mfcc_filename = f'{CURRENT_FOLDER}chime_mfcc.csv'
-        raw_df = pd.read_csv(chime_mfcc_filename)
-        df = raw_df.dropna(axis='columns')
+    # final results
+    'final_results': f'{CURRENT_FOLDER}model_final_results.pkl',
+}
 
-        # get features and target
-        X = df.drop(columns=['Unnamed: 0', 'has_child', 'has_male', 'has_female', 'has_human', 'chunkname'])
-        y = df['has_human']
-        train_val_test = gldata.split(X, y)
+MODELS = {
+    'logreg': LogisticRegression,
+    'svm': svm.SVC,
+    'knn': KNeighborsClassifier
+}
 
-        with open(tvt_filename, 'wb') as writefile:
-            pickle.dump(train_val_test, writefile)
+MODEL_PIPELINES = {
+    'logreg': gldata.get_grid_pipeline('logreg'),
+    'svm': gldata.get_grid_pipeline('svm'),
+    'knn': gldata.get_grid_pipeline('knn')
+}
 
-    print('\nloading train_val_test pkl for chime:\n', train_val_test.keys(),'\n')
-    for key, val in train_val_test.items():
-        print(key, val.shape)
+def test_models(X, y):
+    model_grids = {}
 
-    return train_val_test
+    for model_type, model in MODEL_PIPELINES.items():
+        print(f'\nTesting {model_type}')
 
-def reduce_dimensions(X, var_explained=0.5, prev_pca = None):
-    pca = prev_pca or PCA(var_explained)
-    X_transformed = pca.fit_transform(X)
+        # Use cached models when:
+        # 1) testing the pipeline
+        # 2) introducing new models
+        if USE_CACHED[model_type]:
+            print(f'  Using cached model for {model_type}\n')
+            with open(PICKLE_FILENAMES[model_type], 'rb') as readfile:
+                model_grids[model_type] = pickle.load(readfile)
 
-    return (pca, X_transformed)
+        else:
+            model_grids[model_type] = model(X, y, fast=FAST_MODELING)
+            if not FAST_MODELING:
+                print(f'  Saving model for {model_type}\n')
+                with open(PICKLE_FILENAMES[model_type], 'wb') as writefile:
+                    pickle.dump(model_grids[model_type], writefile)
 
+    check_model_grids = model_grids
+    return model_grids
+
+def compare_models(X, y, model_grids):
+    print('\nComparing models\n')
+
+    scores = []
+
+    for model_type, grid in model_grids.items():
+        score = grid.score(X, y)
+        scores.append({
+            'model_type': model_type,
+            'score_metric': score,
+            'model': grid
+        })
+        
+    sorted_scores = sorted(scores, key=lambda obj: obj['score_metric'], reverse=True)
+    
+    return sorted_scores
 
 def main():
-    train_val_test = get_train_val_test(USE_CACHED_TRAIN_VAL_TEST)
-    scaler = StandardScaler()
+    train_val_test = gldata.get_train_val_test(USE_CACHED_TRAIN_VAL_TEST)
 
-    X_train_scaled = scaler.fit_transform(train_val_test['X_cv'])
-    y_train = train_val_test['y_cv']
+    # use pipeline + grid to test models and then compare models based on a f1 score metric
+    model_grids = test_models(train_val_test['X_train'], train_val_test['y_train'])
+    comparisons = compare_models(train_val_test['X_validate'], train_val_test['y_validate'], model_grids)
 
-    X_test = train_val_test['X_test']
-    X_test_scaled = scaler.transform(X_test)
-    y_test = train_val_test['y_test']
+    # based on comparisons get the best model and its optimized params
+    top_model_type = comparisons[0]['model_type']
+    top_model = comparisons[0]['model']
+    top_model_params = top_model.best_params_
 
-    print('\ndata set train balance: ', sum(y_train)/len(y_train) * 100)
-    print('data set test_ balance: ', sum(y_test)/len(y_test) * 100)
+    # create the final model and fit to the X_cv (X_train + X_validate) with:
+    # 1) a pipeline because of scale and PCA transformation
+    # 2) the best params from the top scoring model
+    final_model_pipeline = gldata.get_pipeline(top_model_type)
+    final_model_pipeline.set_params(**top_model_params)
+    final_model_pipeline.fit(train_val_test['X_cv'], train_val_test['y_cv'])
 
-    # single inner loop
-    # pca, X_train_pca = reduce_dimensions(X_train_scaled, 0.5)
-    # logregcv = LogisticRegressionCV(Cs=[1000, 5000, 10000], cv=3)
-    # logregcv.fit(X_train_pca, y_train)
+    final_predict = final_model_pipeline.predict(train_val_test['X_test'])
+    final_score = f1_score(train_val_test['y_test'], final_predict)
 
-    # # y_predictions = logregcv.predict(X_test_scaled, y_test)
-    # X_test_transformed = pca.transform(X_test_scaled)
-    # model_score = logregcv.score(X_test_transformed, y_test)
+    final_results = {
+        'model_comparisons': comparisons,
+        'final_model_type': top_model_type,
+        'final_model_pipeline': final_model_pipeline,
+        'final_score': final_score,
+        'final_predict': final_predict
+    }
 
-    # print('\ntrain score:', logregcv.score(X_train_pca, y_train))
-    # print('test_ score:', logregcv.score(X_test_transformed, y_test))
+    if not FAST_MODELING:
+        print(f'\nSaving final results\n')
+        with open(PICKLE_FILENAMES['final_results'], 'wb') as writefile:
+            pickle.dump(final_results, writefile)
 
-    # return (logregcv, train_val_test, scaler, pca)
-
-
-    results = []
-    for var_explained in np.arange(0.1, 0.9, 0.1):
-
-        pca, X_train_pca = reduce_dimensions(X_train_scaled, var_explained)
-        logregcv = LogisticRegressionCV(Cs=np.arange(1, 10000, 100), cv=3, max_iter=1000)
-        logregcv.fit(X_train_pca, y_train)
-
-        X_test_transformed = pca.transform(X_test_scaled)
-        y_pred = logregcv.predict(X_test_transformed)
-        model_score = logregcv.score(X_test_transformed, y_test)
-        report = classification_report(y_test, y_pred, target_names=['no_human', 'has_human'], output_dict=True)
-
-        results.append({
-            'var_explained': var_explained,
-            'metric': model_score,
-            'n_components': pca.n_components_,
-            'logregcv_cs': logregcv.C_,
-            'pca': pca,
-            'scaler': scaler,
-            'f1_no_human': report['no_human'],
-            'f1_has_human': report['has_human'],
-            'y_pred': y_pred
-
-        })
-
-    results_sorted = sorted(results, reverse=True, key=lambda obj: obj['metric'])
-    return results_sorted
-        
-
-
+    return final_results
 
 
 if __name__ == '__main__':
     results = main()
     print('\nmain() completed\n')
+    print('\nfinal_score:', results['final_score'])
+    print('\nfinal_model_type:', results['final_model_type'])
 
 # {'var_explained': 0.5,
 #   'metric': 0.8487179487179487,

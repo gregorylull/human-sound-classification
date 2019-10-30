@@ -13,7 +13,7 @@ The aim for this file is to do all the analysis for the CHIME project, including
 TODO
 
 MUST
-- Need to use Validation to check model accuracy that is using different 
+- Need to use Validation to check model accuracy that is using different
   number of features (PCA components), DO NOT USE just remainder.
   - done, using Validation to check between classifiers
 
@@ -32,32 +32,28 @@ NICE TO HAVE
 """
 # At this point i do not know how to get the root folder programmatically,
 # if this file/folder is moved around the rel path needs to be updated
+from analysis.chime import reference_code as glref
+from src.utilities import data as gldata
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn import svm
+from sklearn.model_selection import GridSearchCV
+from sklearn.pipeline import Pipeline
+from sklearn.metrics import classification_report, f1_score
+from sklearn.linear_model import LogisticRegression, LogisticRegressionCV
+from sklearn.decomposition import PCA
+from sklearn.preprocessing import StandardScaler
+from matplotlib import pylab as plt
+import pickle
+import json
+import re
+import numpy as np
+import pandas as pd
+import glob
 ROOT_FOLDER = '../../'
 CURRENT_FOLDER = f'analysis/chime/'
 
-import glob
-import pandas as pd
-import numpy as np
-import re
-import json
-import pickle
-from matplotlib import pylab as plt
-
-from sklearn.preprocessing import StandardScaler
-from sklearn.decomposition import PCA
-from sklearn.linear_model import LogisticRegression, LogisticRegressionCV
-from sklearn.metrics import classification_report, f1_score
-
-from sklearn.pipeline import Pipeline
-from sklearn.model_selection import GridSearchCV
-
-from sklearn import svm
-from sklearn.neighbors import KNeighborsClassifier
-
 
 # (glull) custom functions
-from src.utilities import data as gldata
-from analysis.chime import reference_code as glref
 
 # Set to true to use pre split test val train sets.
 USE_CACHED_TRAIN_VAL_TEST = True
@@ -66,7 +62,7 @@ USE_CACHED_TRAIN_VAL_TEST = True
 # 1) test pipeline, and 2) introduce new models
 FAST_MODELING = False
 
-# Metric to compare gridCV, options: 'f1' | 'accuracy' 
+# Metric to compare gridCV, options: 'f1' | 'accuracy'
 METRIC = 'f1'
 
 # Set to False to retrain to model, otherwise use pkl.
@@ -88,6 +84,7 @@ CONFIG = {
     'metric': METRIC
 }
 
+
 def get_filename(name, ext='.pkl', **kwargs):
     folder = CURRENT_FOLDER
     context = CONFIG.copy()
@@ -95,18 +92,9 @@ def get_filename(name, ext='.pkl', **kwargs):
 
     items = (([val for key, val in context.items()]))
     params_postfix = '_'.join(sorted(items))
-    
 
     return f'{folder}{name}_{params_postfix}{ext}'
 
-# PICKLE_FILENAMES = {
-#     'logreg': f'{CURRENT_FOLDER}grid_logreg_{METRIC}.pkl',
-#     'svm': f'{CURRENT_FOLDER}grid_svm_{METRIC}.pkl',
-#     'knn': f'{CURRENT_FOLDER}grid_knn_{METRIC}.pkl',
-
-#     # final results
-#     'final_results': f'{CURRENT_FOLDER}model_final_results_metric_{METRIC}.pkl',
-# }
 
 PICKLE_FILENAMES = {
     'logreg': get_filename('logreg'),
@@ -115,7 +103,7 @@ PICKLE_FILENAMES = {
     'randomforest': get_filename('randomforest'),
 
     # final results
-    'final_results': get_filename('model_final_results_metric')
+    'final_results': get_filename('model_final_results')
 }
 
 MODEL_PIPELINES = {
@@ -124,6 +112,7 @@ MODEL_PIPELINES = {
     'knn': gldata.get_grid_pipeline('knn'),
     'randomforest': gldata.get_grid_pipeline('randomforest'),
 }
+
 
 def test_models(X, y):
     model_grids = {}
@@ -140,7 +129,8 @@ def test_models(X, y):
                 model_grids[model_type] = pickle.load(readfile)
 
         else:
-            model_grids[model_type] = model(X, y, metric=METRIC, fast=FAST_MODELING)
+            model_grids[model_type] = model(
+                X, y, metric=METRIC, fast=FAST_MODELING)
             if not FAST_MODELING:
                 print(f'  Saving model for {model_type}\n')
                 with open(PICKLE_FILENAMES[model_type], 'wb') as writefile:
@@ -148,6 +138,7 @@ def test_models(X, y):
 
     check_model_grids = model_grids
     return model_grids
+
 
 def compare_models(X, y, model_grids):
     print('\nComparing models\n')
@@ -161,17 +152,21 @@ def compare_models(X, y, model_grids):
             'score_metric': score,
             'model': grid
         })
-        
-    sorted_scores = sorted(scores, key=lambda obj: obj['score_metric'], reverse=True)
-    
+
+    sorted_scores = sorted(
+        scores, key=lambda obj: obj['score_metric'], reverse=True)
+
     return sorted_scores
+
 
 def main():
     train_val_test = gldata.get_train_val_test(USE_CACHED_TRAIN_VAL_TEST)
 
     # use pipeline + grid to test models and then compare models based on a f1 score metric
-    model_grids = test_models(train_val_test['X_train'], train_val_test['y_train'])
-    comparisons = compare_models(train_val_test['X_validate'], train_val_test['y_validate'], model_grids)
+    model_grids = test_models(
+        train_val_test['X_train'], train_val_test['y_train'])
+    comparisons = compare_models(
+        train_val_test['X_validate'], train_val_test['y_validate'], model_grids)
 
     # based on comparisons get the best model and its optimized params
     top_model_type = comparisons[0]['model_type']
@@ -218,7 +213,8 @@ def main():
     print('\nmain() completed\n')
     print('\nnaive_score:', final_results['naive_model_score'])
     print('\nfinal_score:', final_results['final_score'])
-    print('\n(final - naive) / naive:', (final_results['final_score'] - final_results['naive_model_score'])/final_results['naive_model_score'] * 100, '%')
+    print('\n(final - naive) / naive:',
+          (final_results['final_score'] - final_results['naive_model_score'])/final_results['naive_model_score'] * 100, '%')
     print('\nfinal_model_type:', final_results['final_model_type'])
 
     return final_results

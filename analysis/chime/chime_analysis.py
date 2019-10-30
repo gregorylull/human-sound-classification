@@ -74,9 +74,9 @@ METRIC = 'f1'
 
 # debug
 USE_CACHED = {
-    'logreg': False,
-    'svm': False,
-    'knn': False,
+    'logreg': True,
+    'svm': True,
+    'knn': True,
     'randomforest': False
 }
 
@@ -97,10 +97,10 @@ def get_filename(name, ext='.pkl', **kwargs):
 
 
 PICKLE_FILENAMES = {
-    'logreg': get_filename('logreg'),
-    'svm': get_filename('svm'),
-    'knn': get_filename('knn'),
-    'randomforest': get_filename('randomforest'),
+    'logreg': get_filename('grid_logreg'),
+    'svm': get_filename('grid_svm'),
+    'knn': get_filename('grid_knn'),
+    'randomforest': get_filename('grid_randomforest'),
 
     # final results
     'final_results': get_filename('model_final_results')

@@ -26,7 +26,6 @@ from sklearn.ensemble import RandomForestClassifier
 ROOT_FOLDER = '../../'
 CHIME_FOLDER = f'analysis/chime/'
 
-
 def get_params(model='logreg', **kwargs):
 
     # exit early and use model defaults when testing pipeline and introducing new models.

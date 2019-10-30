@@ -102,4 +102,26 @@ venv.bak/
 
 # mypy
 .mypy_cache/
+
+# glull project
 data/
+analysis/**/*.csv
+analysis/**/*.pkl
+analysis/**/*.zip
+
+!analysis/chime/chime_mfcc_features_only.pkl.zip
+!analysis/chime/chime_mfcc.csv.zip
+!analysis/chime/train_val_test.pkl.zip
+
+!analysis/chime/grid_*.pkl
+!analysis/chime/grid_*.pkl
+!analysis/chime/grid_*.pkl
+!analysis/chime/model_final_results*.pkl
+
+.dev
+
+# mac
+.DS_Store
+.vscode
+
+

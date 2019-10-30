@@ -13,14 +13,21 @@ The aim for this file is to do all the analysis for the CHIME project, including
 TODO
 
 MUST
-0. Need to use Validation to check model accuracy that is using different 
+- Need to use Validation to check model accuracy that is using different 
   number of features (PCA components), DO NOT USE just remainder.
+  - done, using Validation to check between classifiers
 
-1. LogisticRegressionCV can't guarantee your X input is going to be split
+- LogisticRegressionCV can't guarantee your X input is going to be split
   and standardized correctly. DO NOT USE.
+  - done, replaced with pipeline + gridsearchcv
 
 NICE TO HAVE
-2. Play around with thresholds for classifying
+- Play around with thresholds for classifying
+    - is there a way to add this to the pipeline itself, e.g., given a certain combo
+      of coefs_, i want to see the metric scores using different proba ranges
+
+- stratified sampling for my dataset, I think this just needs to be added to my get_train_val_test method?
+
 
 """
 # At this point i do not know how to get the root folder programmatically,
@@ -63,31 +70,59 @@ FAST_MODELING = False
 METRIC = 'f1'
 
 # Set to False to retrain to model, otherwise use pkl.
+# USE_CACHED = {
+#     'logreg': False,
+#     'svm': False,
+#     'knn': False
+# }
+
+# debug
 USE_CACHED = {
     'logreg': False,
     'svm': False,
-    'knn': False
+    'knn': False,
+    'randomforest': False
 }
+
+CONFIG = {
+    'metric': METRIC
+}
+
+def get_filename(name, ext='.pkl', **kwargs):
+    folder = CURRENT_FOLDER
+    context = CONFIG.copy()
+    context.update(kwargs)
+
+    items = (([val for key, val in context.items()]))
+    params_postfix = '_'.join(sorted(items))
+    
+
+    return f'{folder}{name}_{params_postfix}{ext}'
+
+# PICKLE_FILENAMES = {
+#     'logreg': f'{CURRENT_FOLDER}grid_logreg_{METRIC}.pkl',
+#     'svm': f'{CURRENT_FOLDER}grid_svm_{METRIC}.pkl',
+#     'knn': f'{CURRENT_FOLDER}grid_knn_{METRIC}.pkl',
+
+#     # final results
+#     'final_results': f'{CURRENT_FOLDER}model_final_results_metric_{METRIC}.pkl',
+# }
 
 PICKLE_FILENAMES = {
-    'logreg': f'{CURRENT_FOLDER}grid_logreg_{METRIC}.pkl',
-    'svm': f'{CURRENT_FOLDER}grid_svm_{METRIC}.pkl',
-    'knn': f'{CURRENT_FOLDER}grid_knn_{METRIC}.pkl',
+    'logreg': get_filename('logreg'),
+    'svm': get_filename('svm'),
+    'knn': get_filename('knn'),
+    'randomforest': get_filename('randomforest'),
 
     # final results
-    'final_results': f'{CURRENT_FOLDER}model_final_results_metric_{METRIC}.pkl',
-}
-
-MODELS = {
-    'logreg': LogisticRegression,
-    'svm': svm.SVC,
-    'knn': KNeighborsClassifier
+    'final_results': get_filename('model_final_results_metric')
 }
 
 MODEL_PIPELINES = {
     'logreg': gldata.get_grid_pipeline('logreg'),
     'svm': gldata.get_grid_pipeline('svm'),
-    'knn': gldata.get_grid_pipeline('knn')
+    'knn': gldata.get_grid_pipeline('knn'),
+    'randomforest': gldata.get_grid_pipeline('randomforest'),
 }
 
 def test_models(X, y):
@@ -150,15 +185,29 @@ def main():
     final_model_pipeline.set_params(**top_model_params)
     final_model_pipeline.fit(train_val_test['X_cv'], train_val_test['y_cv'])
 
+    scorer = gldata.get_scoring_metric(metric=METRIC)
     final_predict = final_model_pipeline.predict(train_val_test['X_test'])
-    final_score = f1_score(train_val_test['y_test'], final_predict)
+    final_score = scorer(
+        final_model_pipeline,
+        train_val_test['X_test'],
+        train_val_test['y_test']
+    )
+
+    naive_model_score = scorer(
+        gldata.NaiveModel(train_val_test['y_test']),
+        train_val_test['X_test'],
+        train_val_test['y_test']
+    )
 
     final_results = {
+        'score_metric': METRIC,
+        'scorer': scorer,
         'model_comparisons': comparisons,
         'final_model_type': top_model_type,
         'final_model_pipeline': final_model_pipeline,
         'final_score': final_score,
-        'final_predict': final_predict
+        'final_predict': final_predict,
+        'naive_model_score': naive_model_score
     }
 
     if not FAST_MODELING:
@@ -166,14 +215,17 @@ def main():
         with open(PICKLE_FILENAMES['final_results'], 'wb') as writefile:
             pickle.dump(final_results, writefile)
 
+    print('\nmain() completed\n')
+    print('\nnaive_score:', final_results['naive_model_score'])
+    print('\nfinal_score:', final_results['final_score'])
+    print('\n(final - naive) / naive:', (final_results['final_score'] - final_results['naive_model_score'])/final_results['naive_model_score'] * 100, '%')
+    print('\nfinal_model_type:', final_results['final_model_type'])
+
     return final_results
 
 
 if __name__ == '__main__':
     results = main()
-    print('\nmain() completed\n')
-    print('\nfinal_score:', results['final_score'])
-    print('\nfinal_model_type:', results['final_model_type'])
 
 # {'var_explained': 0.5,
 #   'metric': 0.8487179487179487,

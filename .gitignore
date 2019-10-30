@@ -118,8 +118,10 @@ analysis/**/*.zip
 !analysis/chime/grid_*.pkl
 !analysis/chime/model_final_results*.pkl
 
+.dev
 
 # mac
 .DS_Store
 .vscode
+
 

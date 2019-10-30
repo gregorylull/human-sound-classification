@@ -19,6 +19,7 @@ from sklearn.pipeline import Pipeline
 from sklearn.model_selection import GridSearchCV
 from sklearn.neighbors import KNeighborsClassifier
 
+from sklearn.ensemble import RandomForestClassifier
 
 # At this point i do not know how to get the root folder programmatically,
 # if this file/folder is moved around the rel path needs to be updated
@@ -52,13 +53,13 @@ def get_params(model='logreg', **kwargs):
             'svm__kernel': ['linear', 'poly', 'rbf'],
 
             # the higher the gamma the more likely model will overfit to the data.
-            'svm__gamma': [*np.arange(0.1, 1, 0.2), 1, 2, 3],
+            'svm__gamma': [*np.arange(0.1, 1, 0.2), 1, 3, 5, 10],
 
             # C relates to the penalty term, moves the boundary, high will lead to overfit
-            'svm__C': [0.1, 0.5, 1, 3, 5],
+            'svm__C': [0.1, 0.5, 1, 3, 5, 10],
 
             # degree is for polynomial
-            'svm__degree': [1, 2, 3, 4],
+            'svm__degree': [1, 2, 3, 4, 5],
 
             'pca__n_components': pca_component_range
         }
@@ -68,6 +69,13 @@ def get_params(model='logreg', **kwargs):
             'knn__n_neighbors': np.arange(5, 30, 5),
             'pca__n_components': pca_component_range
         }
+    
+    elif model=='randomforest':
+        return {
+            'pca__n_components': pca_component_range,
+            'randomforest__n_estimators': np.arange(10, 150, 15)
+        }
+
 
 def get_grid_pipeline(model_type, params_=None):
     def pipeline(X, y, **kwargs):
@@ -92,14 +100,18 @@ def get_grid_pipeline(model_type, params_=None):
 
 def get_model(model='logreg'):
     if model=='logreg':
-        return LogisticRegression(solver='lbfgs', max_iter=500)
+        return LogisticRegression(solver='lbfgs', max_iter=1000)
 
     elif model=='svm':
         return svm.SVC(gamma='auto', cache_size=1000, max_iter=5000)
 
     elif model=='knn':
         return KNeighborsClassifier()
+    
+    elif model=='randomforest':
+        return RandomForestClassifier(n_estimators=10)
 
+# returns scorer(estimator, X_, y_)
 def get_scoring_metric(**kwargs):
     metric = kwargs['metric'] if 'metric' in kwargs and kwargs['metric'] else 'accuracy'
 
@@ -138,15 +150,19 @@ def train_fit_test_pipeline(X, y, model_type='logreg', params={}, cv=3, **kwargs
     return grid
 
 def split(X, y, test_size=0.2):
+    """
+    Split data into stratified Train, Validate, Test.
+    """
+
 
     # get Test, set aside
     X_remainder, X_test, y_remainder, y_test = train_test_split(
-        X, y, test_size=test_size
+        X, y, test_size=test_size, stratify=y
     )
 
     # get Train, Validate
     X_train, X_validate, y_train, y_validate = train_test_split(
-        X_remainder, y_remainder, test_size=test_size
+        X_remainder, y_remainder, test_size=test_size, stratify=y_remainder
     )
 
     return {
@@ -167,7 +183,7 @@ def split(X, y, test_size=0.2):
         'y_cv': y_remainder
     }
 
-def get_train_val_test(use_saved):
+def get_train_val_test(use_saved=False):
     """
     This is specific to the chime data set
     """
@@ -198,3 +214,11 @@ def get_train_val_test(use_saved):
         print(key, val.shape)
 
     return train_val_test
+
+class NaiveModel:
+
+    def __init__(self, y, predicting_class=1):
+        self.results = [predicting_class] * len(y)
+
+    def predict(self, *args, **kwargs):
+        return self.results
